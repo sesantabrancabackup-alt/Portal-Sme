@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autorizar Acesso - Portal SME</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md">
+        <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">Autorizar Acesso</h2>
+            <p class="text-sm text-gray-500 mt-2">O aplicativo <strong id="nomeApp">...</strong> deseja acessar sua conta do Portal SME.</p>
+        </div>
+
+        <div class="flex gap-4">
+            <button id="btnNegar" class="flex-1 bg-gray-200 text-gray-700 p-3 rounded-lg hover:bg-gray-300 transition font-semibold">
+                Negar
+            </button>
+            <button id="btnAprovar" class="flex-1 bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 transition font-semibold">
+                Autorizar
+            </button>
+        </div>
+        
+        <div id="mensagem" class="mt-4 text-center text-sm hidden"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://zoyiphlxylsxhefmkcwz.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_bgyHgeKxR7-3ftWx0wYVxg_5k_n7Pzx';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const authorizationId = urlParams.get('authorization_id');
+        const msgEl = document.getElementById('mensagem');
+
+        async function init() {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) {
+                window.location.href = `index.html?redirect=${encodeURIComponent(window.location.href)}`;
+                return;
+            }
+
+            if (!authorizationId) {
+                mostrarErro('ID de autorização não encontrado.');
+                return;
+            }
+
+            const { data, error } = await supabaseClient.auth.oauth.getAuthorizationDetails(authorizationId);
+            if (error || !data) {
+                mostrarErro('Não foi possível carregar os detalhes da autorização.');
+                return;
+            }
+
+            document.getElementById('nomeApp').textContent = data.client.name;
+        }
+
+        function mostrarErro(texto) {
+            msgEl.textContent = '❌ ' + texto;
+            msgEl.classList.remove('hidden');
+            msgEl.classList.add('text-red-500');
+        }
+
+        document.getElementById('btnAprovar').addEventListener('click', async () => {
+            const { data, error } = await supabaseClient.auth.oauth.approveAuthorization(authorizationId);
+            if (error) {
+                mostrarErro('Erro ao autorizar: ' + error.message);
+                return;
+            }
+            window.location.href = data.redirect_url;
+        });
+
+        document.getElementById('btnNegar').addEventListener('click', async () => {
+            const { data, error } = await supabaseClient.auth.oauth.denyAuthorization(authorizationId);
+            if (error) {
+                mostrarErro('Erro ao negar: ' + error.message);
+                return;
+            }
+            window.location.href = data.redirect_url;
+        });
+
+        init();
+    </script>
+</body>
+</html>
