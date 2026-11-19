@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal SME - Secretaria Municipal de Santa Branca</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Navbar -->
+    <nav class="bg-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-20 items-center"> <!-- Aumentei a altura para o logo respirar -->
+                <div class="flex items-center gap-4">
+                    <!-- Logo da Prefeitura -->
+                    <img src="logo-prefeitura.png" alt="Prefeitura de Santa Branca" class="h-12 w-auto" onerror="this.style.display='none'">
+                    
+                    <div class="border-l-2 border-gray-200 pl-4"> <!-- Linha divisória opcional -->
+                        <h1 class="text-xl font-bold text-gray-800 leading-tight">Portal SME</h1>
+                        <p class="text-xs text-gray-500">Secretaria Municipal de Santa Branca</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span id="nomeUsuario" class="text-sm text-gray-700 font-medium"></span>
+                    <button id="btnSair" class="text-sm text-red-600 hover:text-red-800 font-semibold transition">
+                        Sair
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Conteúdo -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold text-gray-800">Bem-vindo(a)</h2>
+            <p class="text-gray-600">Selecione um sistema para acessar.</p>
+        </div>
+
+        <!-- Grid de Sistemas -->
+        <div id="gridSistemas" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div class="col-span-full text-center text-gray-500 py-10" id="loading">
+                Carregando sistemas...
+            </div>
+        </div>
+    </main>
+
+    <script src="supabase.js"></script>
+    <script>
+        async function init() {
+            const { data: { session } } = await window.supabaseClient.auth.getSession();
+            
+            if (!session) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            const nome = session.user.user_metadata?.nome || session.user.email;
+            document.getElementById('nomeUsuario').textContent = nome;
+
+            const sistemas = await listarSistemas();
+            renderizarSistemas(sistemas);
+        }
+
+        function renderizarSistemas(sistemas) {
+            const grid = document.getElementById('gridSistemas');
+            grid.innerHTML = '';
+
+            if (sistemas.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full text-center text-gray-500 py-10">
+                        Nenhum sistema disponível no momento.
+                    </div>
+                `;
+                return;
+            }
+
+            sistemas.forEach(sistema => {
+                const card = document.createElement('a');
+                
+                // Lógica para sistema em construção
+                if (sistema.em_construcao) {
+                    card.href = 'javascript:void(0)';
+                    card.className = 'block bg-gray-100 rounded-xl shadow-sm p-6 border-2 border-dashed border-gray-300 relative cursor-not-allowed opacity-80';
+                } else {
+                    card.href = sistema.url;
+                    card.target = '_blank';
+                    card.rel = 'noopener noreferrer';
+                    card.className = 'block bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-200 p-6 border border-gray-200 hover:border-blue-400 transform hover:-translate-y-1 cursor-pointer';
+                }
+
+                // Renderiza a imagem do ícone
+                let iconeHtml = '';
+                if (sistema.icone) {
+                    iconeHtml = `<img src="${sistema.icone}" alt="${sistema.nome}" class="w-24 h-24 object-contain mb-4 mx-auto">`;
+                } else {
+                    // Ícone padrão em SVG caso não tenha imagem
+                    iconeHtml = `
+                        <div class="w-24 h-24 mb-4 mx-auto flex items-center justify-center bg-gray-200 rounded-lg">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                        </div>
+                    `;
+                }
+
+                // Badge de "Em Construção"
+                const badgeConstrucao = sistema.em_construcao 
+                    ? `<span class="absolute top-4 right-4 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full shadow-sm">Em Construção</span>` 
+                    : '';
+
+                card.innerHTML = `
+                    ${badgeConstrucao}
+                    <div class="text-center mt-2">
+                        ${iconeHtml}
+                        <h3 class="text-lg font-bold text-gray-800 mb-2">${sistema.nome}</h3>
+                        <p class="text-sm text-gray-600 line-clamp-2">${sistema.descricao || ''}</p>
+                    </div>
+                    
+                    ${!sistema.em_construcao ? `
+                    <div class="mt-4 flex items-center justify-center text-blue-600 text-sm font-semibold">
+                        Acessar
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                    </div>
+                    ` : ''}
+                `;
+
+                // Só registra o acesso se não estiver em construção
+                if (!sistema.em_construcao) {
+                    card.addEventListener('click', () => {
+                        registrarAcesso(sistema.id);
+                    });
+                }
+
+                grid.appendChild(card);
+            });
+        }
+
+        document.getElementById('btnSair').addEventListener('click', fazerLogout);
+        init();
+    </script>
+</body>
+</html>
